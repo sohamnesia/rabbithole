@@ -1,5 +1,7 @@
 # 🕳️ Rabbit Hole Studio
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Play_Now-blue?style=for-the-badge)](https://rabbithole-rose.vercel.app)
+
 An impossibly sleek, AI-powered graph explorer built to help you tumble down internet rabbit holes without the noise. 
 
 Start with a single topic, let the AI generate hyper-relevant connections, and merge multiple ideas to deduce common overlaps—all laid out on a stunning, minimalist canvas.
