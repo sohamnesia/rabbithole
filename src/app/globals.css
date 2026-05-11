@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", var(--font-sans);
+  --color-zinc-950: #09090b;
+  --color-zinc-900: #18181b;
+  --color-zinc-800: #27272a;
+}
+
+:root {
+  --background: var(--color-zinc-950);
+  --foreground: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.panel {
+  background: rgba(9, 9, 11, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 20px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(250, 250, 250, 0.4);
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__controls {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(9, 9, 11, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  color: #fafafa !important;
+  border-bottom-color: rgba(255, 255, 255, 0.05) !important;
+  transition: background 0.2s ease;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.react-flow__minimap {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(9, 9, 11, 0.7) !important;
+  backdrop-filter: blur(12px);
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.6);
+}
