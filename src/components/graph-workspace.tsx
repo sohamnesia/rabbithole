@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, useEffect } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -34,6 +34,7 @@ import {
   Minus,
   Plus,
   Search,
+  Settings,
   Sparkles,
   Trash2,
   X,
@@ -131,10 +132,15 @@ function RabbitNode({ data, selected }: NodeProps<Node<GraphNodeData>>) {
 
 const nodeTypes = { rabbitNode: RabbitNode };
 
-async function postExplore(body: unknown) {
+async function postExplore(body: unknown, apiKey?: string) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-groq-api-key"] = apiKey;
+  }
+
   const response = await fetch("/api/explore", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -146,16 +152,16 @@ async function postExplore(body: unknown) {
   return (await response.json()) as ExplorePayload;
 }
 
-async function fetchSeed(topic: string) {
-  return postExplore({ mode: "seed", topic });
+async function fetchSeed(topic: string, apiKey?: string) {
+  return postExplore({ mode: "seed", topic }, apiKey);
 }
 
-async function fetchExpand(topic: string, count: number) {
-  return postExplore({ mode: "expand", topic, count });
+async function fetchExpand(topic: string, count: number, apiKey?: string) {
+  return postExplore({ mode: "expand", topic, count }, apiKey);
 }
 
-async function fetchBridge(topics: string[], count: number) {
-  return postExplore({ mode: "bridge", topics, count });
+async function fetchBridge(topics: string[], count: number, apiKey?: string) {
+  return postExplore({ mode: "bridge", topics, count }, apiKey);
 }
 
 export function GraphWorkspace() {
@@ -171,6 +177,22 @@ export function GraphWorkspace() {
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance<Node<GraphNodeData>, Edge> | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [apiKey, setApiKey] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const storedKey = localStorage.getItem("rabbithole_api_key");
+    if (storedKey) {
+      setApiKey(storedKey);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem("rabbithole_api_key", key);
+    setIsSettingsOpen(false);
+  };
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedId) ?? null,
@@ -324,7 +346,7 @@ export function GraphWorkspace() {
           return;
         }
 
-        const payload = await fetchSeed(seed);
+        const payload = await fetchSeed(seed, apiKey);
         const rootCount = nodes.filter((node) => node.data.kind === "topic").length;
         const origin =
           nodes.length === 0
@@ -350,7 +372,7 @@ export function GraphWorkspace() {
       setStatus(`Generating ${expandCount} related node${expandCount > 1 ? "s" : ""} for ${parent.data.title}...`);
 
       try {
-        const payload = await fetchExpand(parent.data.title, expandCount);
+        const payload = await fetchExpand(parent.data.title, expandCount, apiKey);
 
         setNodes((current) =>
           current.map((node) =>
@@ -428,7 +450,7 @@ export function GraphWorkspace() {
       setStatus(`Building overlap for ${titles.join(", ")}...`);
 
       try {
-        const payload = await fetchBridge(titles, 1);
+        const payload = await fetchBridge(titles, 1, apiKey);
         const midpoint = group.reduce(
           (acc, node) => ({
             x: acc.x + node.position.x / group.length,
@@ -482,32 +504,32 @@ export function GraphWorkspace() {
   return (
     <main className="relative flex h-screen w-screen overflow-hidden bg-zinc-950 font-sans text-zinc-50">
       {/* Top Left Elements: Title, Status, and Controls */}
-      <div className="pointer-events-none absolute left-6 top-6 z-40 flex flex-col gap-4">
-        <div className="pointer-events-auto max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-none absolute left-4 top-4 md:left-6 md:top-6 z-40 flex flex-col gap-4 max-w-[calc(100vw-2rem)] md:max-w-none">
+        <div className="pointer-events-auto max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4 md:p-5 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <Layers3 className="size-5 text-zinc-100" />
             <h1 className="text-base font-semibold tracking-tight text-zinc-100">
               Rabbit Hole Studio
             </h1>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+          <p className="mt-2 text-xs leading-relaxed text-zinc-400 hidden md:block">
             Seed a topic, expand purposefully, and merge ideas to discover overlap.
           </p>
           <div className="mt-4 flex items-center gap-2">
             {isPending ? (
-              <LoaderCircle className="size-3.5 animate-spin text-zinc-500" />
+              <LoaderCircle className="size-3.5 animate-spin text-zinc-500 shrink-0" />
             ) : (
-              <Compass className="size-3.5 text-zinc-500" />
+              <Compass className="size-3.5 text-zinc-500 shrink-0" />
             )}
             <div className="text-xs text-zinc-300">{status}</div>
           </div>
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-2">
+        <div className="pointer-events-auto flex items-center gap-2 hidden md:flex">
           <CountControl label="Expand" value={expandCount} onChange={setExpandCount} />
         </div>
 
-        <div className="pointer-events-auto flex flex-wrap gap-2 max-w-sm">
+        <div className="pointer-events-auto flex flex-wrap gap-2 max-w-sm hidden md:flex">
           {examples.map((example) => (
             <button
               key={example}
@@ -562,51 +584,58 @@ export function GraphWorkspace() {
       </div>
 
       {/* Floating Command Dock (Bottom Center) */}
-      <div className="absolute bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950/90 p-2 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-        <label className="relative ml-2 flex items-center">
-          <Search className="absolute left-3 size-4 text-zinc-500" />
+      <div className="absolute bottom-6 left-1/2 z-50 flex w-[calc(100vw-2rem)] md:w-auto -translate-x-1/2 items-center justify-between md:justify-start gap-1 md:gap-2 rounded-full border border-zinc-800 bg-zinc-950/90 p-1.5 md:p-2 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl overflow-x-auto scrollbar-hide">
+        <label className="relative ml-1 md:ml-2 flex items-center flex-1 md:flex-none min-w-[100px]">
+          <Search className="absolute left-3 size-4 text-zinc-500 hidden md:block" />
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddTopic(topic)}
-            placeholder="Search topic..."
-            className="w-64 rounded-full border border-transparent bg-transparent py-2 pl-9 pr-4 text-sm text-zinc-100 outline-none transition-all placeholder:text-zinc-600 focus:bg-zinc-900 focus:border-zinc-700"
+            placeholder="Search..."
+            className="w-full md:w-64 rounded-full border border-transparent bg-transparent py-2 pl-3 md:pl-9 pr-2 md:pr-4 text-sm text-zinc-100 outline-none transition-all placeholder:text-zinc-600 focus:bg-zinc-900 focus:border-zinc-700"
           />
         </label>
-        <div className="h-6 w-px bg-zinc-800 mx-1" />
-        <ToolbarButton
-          icon={<Plus className="size-4" />}
-          label="Add"
-          onClick={() => handleAddTopic(topic)}
-          emphasis="primary"
-        />
-        <ToolbarButton
-          icon={<GitMerge className="size-4" />}
-          label={`Join (${joinSelection.length})`}
-          onClick={() => buildJoinGroup(joinSelection)}
-          disabled={joinSelection.length < 2}
-        />
-        <ToolbarButton
-          icon={<Trash2 className="size-4" />}
-          label="Reset"
-          onClick={() => {
-            setNodes([]);
-            setEdges([]);
-            setSelectedId(null);
-            setJoinSelection([]);
-            setStatus("Canvas cleared.");
-          }}
-        />
+        <div className="h-6 w-px bg-zinc-800 mx-0.5 md:mx-1 shrink-0" />
+        <div className="flex items-center gap-1 shrink-0 pr-1">
+          <ToolbarButton
+            icon={<Plus className="size-4" />}
+            label="Add"
+            onClick={() => handleAddTopic(topic)}
+            emphasis="primary"
+          />
+          <ToolbarButton
+            icon={<GitMerge className="size-4" />}
+            label={`Join`}
+            onClick={() => buildJoinGroup(joinSelection)}
+            disabled={joinSelection.length < 2}
+          />
+          <ToolbarButton
+            icon={<Trash2 className="size-4" />}
+            label=""
+            onClick={() => {
+              setNodes([]);
+              setEdges([]);
+              setSelectedId(null);
+              setJoinSelection([]);
+              setStatus("Canvas cleared.");
+            }}
+          />
+          <ToolbarButton
+            icon={<Settings className="size-4" />}
+            label=""
+            onClick={() => setIsSettingsOpen(true)}
+          />
+        </div>
       </div>
 
       {/* Sliding Inspector Panel (Right side) */}
       <div
         className={clsx(
-          "pointer-events-none absolute inset-y-6 right-6 z-40 w-full max-w-sm transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)",
-          inspectorOpen ? "translate-x-0 opacity-100" : "translate-x-12 opacity-0",
+          "pointer-events-none absolute inset-0 md:inset-y-6 md:inset-x-auto md:right-6 z-50 w-full md:max-w-sm transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)",
+          inspectorOpen ? "translate-x-0 opacity-100" : "translate-x-full md:translate-x-12 opacity-0",
         )}
       >
-        <div className="pointer-events-auto h-full rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl backdrop-blur-xl flex flex-col">
+        <div className="pointer-events-auto h-full md:rounded-3xl border-l md:border border-zinc-800 bg-zinc-950/95 md:bg-zinc-950/80 p-6 shadow-2xl backdrop-blur-2xl flex flex-col">
           <div className="flex items-center justify-between mb-6 border-b border-zinc-900 pb-4">
             <div className="text-[10px] uppercase tracking-widest text-zinc-500">Inspector</div>
             <button
@@ -673,6 +702,44 @@ export function GraphWorkspace() {
           ) : null}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-zinc-100">Settings</h2>
+            <div className="mb-6">
+              <label className="mb-2 block text-sm font-medium text-zinc-400">
+                Bring Your Own Key (BYOK) - Groq API Key
+              </label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="gsk_..."
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+              />
+              <p className="mt-2 text-xs text-zinc-500">
+                Your key is stored locally in your browser and used to bypass rate limits.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveApiKey(apiKey)}
+                className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

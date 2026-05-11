@@ -20,13 +20,15 @@ const requestSchema = z.discriminatedUnion("mode", [
   }),
 ]);
 
-const client = process.env.GROQ_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROQ_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1",
-      timeout: 60000,
-    })
-  : null;
+function getClient(customKey?: string) {
+  const key = customKey || process.env.GROQ_API_KEY;
+  if (!key) return null;
+  return new OpenAI({
+    apiKey: key,
+    baseURL: "https://api.groq.com/openai/v1",
+    timeout: 60000,
+  });
+}
 
 function stripCodeFences(value: string) {
   return value.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -232,9 +234,10 @@ Rules:
 `.trim();
 }
 
-async function buildLivePayload(prompt: string): Promise<ExplorePayload> {
+async function buildLivePayload(prompt: string, customKey?: string): Promise<ExplorePayload> {
+  const client = getClient(customKey);
   if (!client) {
-    throw new Error("Missing GROQ_API_KEY.");
+    throw new Error("Missing API Key. Please provide a BYOK key in settings or set GROQ_API_KEY on the server.");
   }
 
   const response = await client.chat.completions.create({
@@ -310,16 +313,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  const customKey = request.headers.get("x-groq-api-key") ?? undefined;
+
   try {
     const payload =
       parsedBody.data.mode === "seed"
-        ? await buildLivePayload(buildSeedPrompt(parsedBody.data.topic))
+        ? await buildLivePayload(buildSeedPrompt(parsedBody.data.topic), customKey)
         : parsedBody.data.mode === "expand"
           ? await buildLivePayload(
               buildExpandPrompt(parsedBody.data.topic, parsedBody.data.count),
+              customKey,
             )
           : await buildLivePayload(
               buildBridgePrompt(parsedBody.data.topics, parsedBody.data.count),
+              customKey,
             );
 
     // Call discord webhook asynchronously
